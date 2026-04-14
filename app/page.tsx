@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 export default function Home() {
   const [decks, setDecks] = useState<any[]>([])
@@ -10,29 +11,49 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [dragOver, setDragOver] = useState(false)
+  const [user, setUser] = useState<any>(null)
+  const router = useRouter()
 
-  useEffect(() => { fetchDecks() }, [])
+  useEffect(() => {
+    checkUser()
+  }, [])
 
-  async function fetchDecks() {
-    const { data } = await supabase.from('decks').select('*').order('created_at', { ascending: false })
+  async function checkUser() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      router.push('/login')
+      return
+    }
+    setUser(user)
+    fetchDecks(user.id)
+  }
+
+  async function fetchDecks(userId: string) {
+    const { data } = await supabase.from('decks').select('*').eq('user_id', userId).order('created_at', { ascending: false })
     setDecks(data || [])
+  }
+
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+    router.push('/login')
   }
 
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault()
-    if (!file || !deckName) return
+    if (!file || !deckName || !user) return
     setLoading(true)
     setMessage('')
     const formData = new FormData()
     formData.append('pdf', file)
     formData.append('deckName', deckName)
+    formData.append('userId', user.id)
     const res = await fetch('/api/generate', { method: 'POST', body: formData })
     const data = await res.json()
     if (data.success) {
       setMessage(`✅ Created ${data.cardCount} flashcards!`)
       setDeckName('')
       setFile(null)
-      fetchDecks()
+      fetchDecks(user.id)
     } else {
       setMessage('❌ Error: ' + data.error)
     }
@@ -41,27 +62,32 @@ export default function Home() {
 
   async function deleteDeck(id: string) {
     await supabase.from('decks').delete().eq('id', id)
-    fetchDecks()
+    fetchDecks(user.id)
   }
 
   return (
     <main style={{ maxWidth: 680, margin: '0 auto', padding: '2.5rem 1.5rem' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
-        <div style={{ width: 36, height: 36, background: '#6366f1', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ width: 12, height: 12, background: 'white', borderRadius: '50%' }} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 36, height: 36, background: '#6366f1', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 12, height: 12, background: 'white', borderRadius: '50%' }} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 700, color: 'white', lineHeight: 1 }}>Flashcard Engine</h1>
+            <p style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>Turn any PDF into a smart study deck</p>
+          </div>
         </div>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'white', lineHeight: 1 }}>Flashcard Engine</h1>
-          <p style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>Turn any PDF into a smart study deck</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 13, color: '#6b7280' }}>{user?.email}</span>
+          <button onClick={handleSignOut} style={{ background: '#1a1a1a', color: '#f87171', border: '1px solid #3f1f1f', padding: '7px 14px', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
+            Sign out
+          </button>
         </div>
       </div>
 
-      {/* Upload Card */}
       <div style={{ background: '#141414', border: '1px solid #222', borderRadius: 16, padding: 24, marginBottom: 32 }}>
         <h2 style={{ fontSize: 15, fontWeight: 600, color: 'white', marginBottom: 16 }}>Create new deck</h2>
         <form onSubmit={handleUpload}>
-          {/* Drop Zone */}
           <div
             onDragOver={e => { e.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
@@ -80,15 +106,13 @@ export default function Home() {
             </p>
             <input id="fileInput" type="file" accept=".pdf" onChange={e => setFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
           </div>
-
           <input
             type="text"
             placeholder="Deck name (e.g. Chapter 5 — Quadratic Equations)"
             value={deckName}
             onChange={e => setDeckName(e.target.value)}
-            style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #2a2a2a', background: '#1a1a1a', color: 'white', fontSize: 14, marginBottom: 12, outline: 'none' }}
+            style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #2a2a2a', background: '#1a1a1a', color: 'white', fontSize: 14, marginBottom: 12, outline: 'none', boxSizing: 'border-box' }}
           />
-
           <button
             type="submit"
             disabled={loading || !file || !deckName}
@@ -96,14 +120,12 @@ export default function Home() {
           >
             {loading ? 'Generating flashcards...' : 'Generate flashcards'}
           </button>
-
           {message && (
             <p style={{ marginTop: 12, fontSize: 13, color: message.startsWith('✅') ? '#34d399' : '#f87171', textAlign: 'center' }}>{message}</p>
           )}
         </form>
       </div>
 
-      {/* Decks List */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <h2 style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>Your decks</h2>
         <span style={{ fontSize: 12, color: '#4b5563' }}>{decks.length} deck{decks.length !== 1 ? 's' : ''}</span>

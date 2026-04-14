@@ -47,9 +47,10 @@ ${cleanText}`
     const cleaned = response.replace(/```json|```/g, '').trim()
     const cards = JSON.parse(cleaned)
 
+    const userId = formData.get('userId') as string
     const { data: deck } = await supabase
       .from('decks')
-      .insert({ name: deckName, card_count: cards.length })
+      .insert({ name: deckName, card_count: cards.length, user_id: userId })
       .select()
       .single()
 
