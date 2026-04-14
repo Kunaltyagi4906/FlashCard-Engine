@@ -1,65 +1,141 @@
-import Image from "next/image";
+'use client'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
+import Link from 'next/link'
 
 export default function Home() {
+  const [decks, setDecks] = useState<any[]>([])
+  const [deckName, setDeckName] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
+  const [dragOver, setDragOver] = useState(false)
+
+  useEffect(() => { fetchDecks() }, [])
+
+  async function fetchDecks() {
+    const { data } = await supabase.from('decks').select('*').order('created_at', { ascending: false })
+    setDecks(data || [])
+  }
+
+  async function handleUpload(e: React.FormEvent) {
+    e.preventDefault()
+    if (!file || !deckName) return
+    setLoading(true)
+    setMessage('')
+    const formData = new FormData()
+    formData.append('pdf', file)
+    formData.append('deckName', deckName)
+    const res = await fetch('/api/generate', { method: 'POST', body: formData })
+    const data = await res.json()
+    if (data.success) {
+      setMessage(`✅ Created ${data.cardCount} flashcards!`)
+      setDeckName('')
+      setFile(null)
+      fetchDecks()
+    } else {
+      setMessage('❌ Error: ' + data.error)
+    }
+    setLoading(false)
+  }
+
+  async function deleteDeck(id: string) {
+    await supabase.from('decks').delete().eq('id', id)
+    fetchDecks()
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main style={{ maxWidth: 680, margin: '0 auto', padding: '2.5rem 1.5rem' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32 }}>
+        <div style={{ width: 36, height: 36, background: '#6366f1', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 12, height: 12, background: 'white', borderRadius: '50%' }} />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'white', lineHeight: 1 }}>Flashcard Engine</h1>
+          <p style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>Turn any PDF into a smart study deck</p>
         </div>
-      </main>
-    </div>
-  );
+      </div>
+
+      {/* Upload Card */}
+      <div style={{ background: '#141414', border: '1px solid #222', borderRadius: 16, padding: 24, marginBottom: 32 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 600, color: 'white', marginBottom: 16 }}>Create new deck</h2>
+        <form onSubmit={handleUpload}>
+          {/* Drop Zone */}
+          <div
+            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) setFile(f) }}
+            onClick={() => document.getElementById('fileInput')?.click()}
+            style={{ border: `2px dashed ${dragOver ? '#6366f1' : '#2a2a2a'}`, borderRadius: 12, padding: '24px 16px', textAlign: 'center', cursor: 'pointer', marginBottom: 12, background: dragOver ? '#1a1a2e' : 'transparent', transition: 'all 0.2s' }}
+          >
+            <div style={{ width: 40, height: 40, background: file ? '#1a1a2e' : '#1a1a1a', border: `1px solid ${file ? '#6366f1' : '#333'}`, borderRadius: 10, margin: '0 auto 10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 16, height: 20, background: file ? '#6366f1' : '#444', borderRadius: 2 }} />
+            </div>
+            <p style={{ fontSize: 13, fontWeight: 600, color: file ? '#a5b4fc' : '#9ca3af' }}>
+              {file ? file.name : 'Drop your PDF here'}
+            </p>
+            <p style={{ fontSize: 12, color: '#4b5563', marginTop: 4 }}>
+              {file ? 'Click to change file' : 'or click to browse'}
+            </p>
+            <input id="fileInput" type="file" accept=".pdf" onChange={e => setFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+          </div>
+
+          <input
+            type="text"
+            placeholder="Deck name (e.g. Chapter 5 — Quadratic Equations)"
+            value={deckName}
+            onChange={e => setDeckName(e.target.value)}
+            style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #2a2a2a', background: '#1a1a1a', color: 'white', fontSize: 14, marginBottom: 12, outline: 'none' }}
+          />
+
+          <button
+            type="submit"
+            disabled={loading || !file || !deckName}
+            style={{ width: '100%', background: loading || !file || !deckName ? '#2a2a2a' : '#6366f1', color: loading || !file || !deckName ? '#4b5563' : 'white', border: 'none', padding: '11px', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: loading || !file || !deckName ? 'not-allowed' : 'pointer', transition: 'all 0.2s' }}
+          >
+            {loading ? 'Generating flashcards...' : 'Generate flashcards'}
+          </button>
+
+          {message && (
+            <p style={{ marginTop: 12, fontSize: 13, color: message.startsWith('✅') ? '#34d399' : '#f87171', textAlign: 'center' }}>{message}</p>
+          )}
+        </form>
+      </div>
+
+      {/* Decks List */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>Your decks</h2>
+        <span style={{ fontSize: 12, color: '#4b5563' }}>{decks.length} deck{decks.length !== 1 ? 's' : ''}</span>
+      </div>
+
+      {decks.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem 0', color: '#4b5563' }}>
+          <p style={{ fontSize: 14 }}>No decks yet. Upload a PDF to get started!</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {decks.map(deck => (
+            <div key={deck.id} style={{ background: '#141414', border: '1px solid #222', borderRadius: 12, padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <p style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>{deck.name}</p>
+                <p style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}>{deck.card_count} cards</p>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Link href={`/dashboard/${deck.id}`} style={{ background: '#1a1a2e', color: '#a5b4fc', padding: '7px 16px', borderRadius: 7, fontSize: 13, fontWeight: 600, border: '1px solid #2a2a3e' }}>
+                  View
+                </Link>
+                <Link href={`/study/${deck.id}`} style={{ background: '#6366f1', color: 'white', padding: '7px 16px', borderRadius: 7, fontSize: 13, fontWeight: 600 }}>
+                  Study
+                </Link>
+                <button onClick={() => deleteDeck(deck.id)} style={{ background: '#1f1010', color: '#f87171', border: '1px solid #3f1f1f', padding: '7px 12px', borderRadius: 7, cursor: 'pointer', fontSize: 13 }}>
+                  ✕
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </main>
+  )
 }
