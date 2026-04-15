@@ -15,19 +15,16 @@ export default function Home() {
   const router = useRouter()
 
   useEffect(() => {
-    checkUser()
-  }, [])
-
-  async function checkUser() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    if (!session) {
       router.push('/login')
-      return
+    } else {
+      setUser(session.user)
+      fetchDecks(session.user.id)
     }
-    setUser(user)
-    fetchDecks(user.id)
-  }
-
+  })
+  return () => subscription.unsubscribe()
+}, [])
   async function fetchDecks(userId: string) {
     const { data } = await supabase.from('decks').select('*').eq('user_id', userId).order('created_at', { ascending: false })
     setDecks(data || [])
