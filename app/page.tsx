@@ -108,7 +108,7 @@ export default function Home() {
           </div>
           <input
             type="text"
-            placeholder="Deck name (e.g. Chapter 5 — Quadratic Equations)"
+            placeholder="Enter Deck name"
             value={deckName}
             onChange={e => setDeckName(e.target.value)}
             style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #2a2a2a', background: '#1a1a1a', color: 'white', fontSize: 14, marginBottom: 12, outline: 'none', boxSizing: 'border-box' }}

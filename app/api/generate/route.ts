@@ -23,22 +23,29 @@ export async function POST(request: NextRequest) {
 
     const completion = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
+      temperature: 0.3,
       messages: [
         {
+          role: 'system',
+          content: `You are an expert teacher and educational content creator. Your job is to create high quality flashcards from study material. 
+
+    You MUST follow these strict rules:
+    - Every question must be directly answerable from the provided text
+    - Never create questions about formatting, metadata, or document structure
+    - Focus on: key concepts, definitions, important facts, relationships between ideas, processes, and examples
+    - Questions must be specific and clear
+    - Answers must be concise but complete (1-3 sentences max)
+    - Never ask "what is the title" or "what is the subject" or anything about the document itself
+    - Write questions a teacher would ask on an exam`
+        },
+        {
           role: 'user',
-          content: `You are an expert teacher. Read this text and create 15-20 high quality flashcards.
+          content: `Create 15 high quality flashcards from this text. Return ONLY a JSON array, no other text, no markdown.
 
-Rules:
-- Cover key concepts, definitions, relationships, and examples
-- Questions should test understanding not just memory
-- Answers should be clear and concise
-- Return ONLY a JSON array, no other text, no markdown
+    Format: [{"question": "...", "answer": "..."}]
 
-Format:
-[{"question": "...", "answer": "..."}]
-
-Text:
-${cleanText}`
+    Text:
+    ${cleanText}`
         }
       ]
     })
